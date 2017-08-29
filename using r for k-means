@@ -1,0 +1,98 @@
+######################################################################################################
+# This script was built to analyze ecommerce click stream data
+#   - K-means clustering 
+#   - K-means clustering
+#   - K-means clustering
+# Work from team skynet at AI Hackathon
+######################################################################################################
+library(psych)          # provides a fast method to measure statistical properties of a parameter
+library(cluster)        # nice clustering package - contains multiple types
+library(corrplot)       # correlation plots
+library(mRMRe)          # determining max relevance variables
+library(rgl)            # 3D plotting
+library(fpc)  
+install.packages("uplift")
+getwd() # check working directory
+
+inPath = file.path("...")
+
+sdata = read.csv(file.path(inPath,"______.csv"), header = TRUE)
+
+# prep data for analysis ##############################################################################
+IDs<-(sdata[,c(1:2)]) # keep first 2 columns (div_num, div_name, lat, lon)
+sdata<-(sdata[,-c(1:2)]) # drop the first 2 columns
+
+# replace missing values w/ mean of column
+for(j in 1:ncol(sdata)){
+   sdata[is.na(sdata[,j]), j] <- mean(sdata[,j], na.rm = TRUE)}
+which(is.na(sdata)) # return integer(0) to show that there are no missing values
+
+# remove all non-numeric data
+ind <- sapply(sdata, is.integer)
+sdata[ind] <- lapply(sdata[ind], as.numeric)
+sdata <- Filter(is.numeric, sdata)
+#######################################################################################################
+
+# determine max relevance parameters ##################################################################
+dd <- mRMR.data(data = sdata)
+feats <- mRMR.classic(data = dd, target_indices = c(ncol(sdata)))
+varImportance <-data.frame('importance'=feats@mi_matrix[nrow(feats@mi_matrix),])
+varImportance$feature <- rownames(varImportance)
+row.names(varImportance) <- NULL
+varImportance <- varImportance[order(varImportance$importance, decreasing=TRUE),]
+print(varImportance)
+#######################################################################################################
+
+# set up data for clustering ##########################################################################
+numV = 6  #set number of variables to use for clustering here
+topV<-(varImportance[1:numV,2])
+topV
+# set up variables for clustering - scale and shift data
+aa<- sdata[,(topV)]
+dim(aa)
+row.names(aa) <- IDs$cust_nbr
+
+# Scale the variables
+usdata = scale(sdata, center = TRUE, scale = TRUE)
+# unxs <- t(apply(usdata, 1, function(r)r*attr(usdata,'scaled:scale') + attr(usdata, 'scaled:center')))
+# row.names(unxs) <- IDs$cust_nbr
+row.names(usdata) <- IDs$cust_nbr
+csdata = scale(aa, center = TRUE, scale = TRUE)
+
+#######################################################################################################
+# Perform K-Means Cluster Analysis ####################################################################
+numC = 4  #set number of clusters
+set.seed(1234)
+
+k2 <- kmeans(csdata, numC, nstart = 25, iter.max=1000)
+
+# Look at the exact clusters below, in order of increasing size
+table(k2$clust)
+
+#  4     3     2     1 
+# 76  3533  4908 91483 
+
+
+clust2<-names(sort(table(k2$clust)))
+clust2
+# get cluster means 
+aggregate(csdata,by=list(k2$cluster),FUN=mean)
+csdata<- data.frame(csdata, k2$cluster) # append cluster assignment
+dim(csdata)
+
+
+# Show data from cluster 1 - The Browsers
+row.names(csdata[k2$clust==clust2[1],])
+
+# Show data from cluster 2 - Lookin, Not Cookin
+row.names(csdata[k2$clust==clust2[2],])
+
+# Show data from cluster 3 - 
+row.names(csdata[k2$clust==clust2[3],])
+
+# Show data from cluster 4
+row.names(csdata[k2$clust==clust2[4],])
+
+head(csdata[k2$clust==clust2[4],])
+
+
